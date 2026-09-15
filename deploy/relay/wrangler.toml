@@ -1,0 +1,40 @@
+# ============================================================
+#  Paseo Relay  ·  relay.llmzx.com
+#
+#  部署：npx wrangler deploy --config deploy/relay/wrangler.toml
+#
+#  与上游 packages/relay/wrangler.toml 的差异（都是必须的）：
+#
+#    1. routes 换成自己的域名
+#    2. account_id 用自己的（或删掉此行让 wrangler 从登录态推断）
+#    3. 删掉 PASEO_RELAY_UPSTREAM —— 上游那行指向
+#       https://paseo-relay-next.fly.dev，是**切流代理**：
+#       cloudflare-adapter.ts 里 `if (env.PASEO_RELAY_UPSTREAM)` 会把请求
+#       整体转发给官方 relay。自建时留着它等于白建。
+# ============================================================
+
+name = "paseo-relay"
+main = "../../packages/relay/src/cloudflare-adapter.ts"
+compatibility_date = "2024-12-01"
+
+# 首次部署改成你的账号 ID（Cloudflare 控制台右下角可复制），
+# 或删掉这一行、直接用 `wrangler login` 的登录态。
+account_id = "07bf21e31115a068efc11916ae6f592f"
+
+# 自定义域名。前提：llmzx.com 已托管在 Cloudflare。
+# 首次 deploy 时 wrangler 会自动创建 DNS 记录并签发证书。
+routes = [{ pattern = "relay.llmzx.com", custom_domain = true }]
+
+[observability]
+enabled = true
+
+# 注意：这里刻意不设 PASEO_RELAY_UPSTREAM。
+# 设置它会把流量转发到上游 relay，而不是由本 Worker 自己处理。
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "RelayDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RelayDurableObject"]

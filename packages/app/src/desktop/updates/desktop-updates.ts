@@ -38,7 +38,11 @@ export interface LocalDaemonVersionResult {
   error: string | null;
 }
 
-const RELEASE_DOWNLOAD_BASE_URL = "https://github.com/getpaseo/paseo/releases/download";
+// Manual DMG download link shown in the update callout. The automatic path is
+// electron-updater, whose feed comes from `app-update.yml` (baked from
+// `packages/desktop/electron-builder.yml`); this only builds the URL behind the button,
+// so both have to point at the same fork or the button downloads from upstream.
+const RELEASE_DOWNLOAD_BASE_URL = "https://github.com/tianyugithub/paseo/releases/download";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

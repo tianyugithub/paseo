@@ -33,7 +33,11 @@ extraResources:
     to: editor-target-icons
 publish:
   provider: github
-  owner: getpaseo
+  # Fork-owned update channel. electron-builder bakes this into the app's
+  # `app-update.yml`, which is what electron-updater reads at runtime — so the built
+  # app can only ever see releases published on this repo. With no releases here the
+  # updater finds nothing and stays quiet; it never falls back to upstream.
+  owner: tianyugithub
   repo: paseo
 mac:
   artifactName: "Paseo-${version}-${arch}.${ext}"

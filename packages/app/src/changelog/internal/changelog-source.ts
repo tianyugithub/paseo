@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { parseChangelog, type ChangelogRelease } from "./parse-changelog";
 
-const CHANGELOG_URL = "https://raw.githubusercontent.com/getpaseo/paseo/main/CHANGELOG.md";
+// Display-only: the "what's new" sheet. Fetched straight from the fork so the notes
+// match the builds that fork actually ships.
+const CHANGELOG_URL = "https://raw.githubusercontent.com/tianyugithub/paseo/main/CHANGELOG.md";
 
 export type ChangelogState =
   | { status: "loading" }

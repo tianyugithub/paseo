@@ -11,6 +11,14 @@ import { formatTokenCount } from "./context-window-meter.utils";
 interface ContextWindowMeterProps {
   maxTokens: number | null;
   usedTokens: number | null;
+  /**
+   * Prompt tokens served from the provider's cache.
+   *
+   * The hit rate is derived as `cachedTokens / usedTokens` rather than passed in: providers
+   * report `contextWindowUsedTokens` as the whole prompt (cache hits plus misses), so the
+   * two fields already carry the ratio and a second derived prop could disagree with them.
+   */
+  cachedTokens?: number | null;
   totalCostUsd?: number | null;
   showPercentage?: boolean;
   serverId?: string;
@@ -47,6 +55,36 @@ function getUsagePercentage(maxTokens: number, usedTokens: number): number | nul
 
 function clampPercentage(value: number): number {
   return Math.max(0, Math.min(100, value));
+}
+
+/**
+ * Share of the prompt that came from the provider's cache.
+ *
+ * Returns null rather than 0 when there is nothing to divide by, so a provider that does not
+ * report cached tokens shows no line at all instead of a misleading "0%".
+ */
+function getCacheHitPercentage(
+  usedTokens: number,
+  cachedTokens: number | null | undefined,
+): number | null {
+  if (typeof cachedTokens !== "number" || !Number.isFinite(cachedTokens) || cachedTokens <= 0) {
+    return null;
+  }
+  if (!isValidUsedTokens(usedTokens) || usedTokens <= 0) {
+    return null;
+  }
+  return clampPercentage((cachedTokens / usedTokens) * 100);
+}
+
+/**
+ * One decimal, **truncated** rather than rounded.
+ *
+ * A cache hit rate sits in the high nineties, so rounding 99.95 to a whole number prints
+ * "100%" — claiming a perfect cache while misses are still happening. Truncating keeps the
+ * figure honest and matches how DSH reports it (99.95% reads as "99.9%").
+ */
+function formatCacheHitPercentage(percentage: number): string {
+  return (Math.floor(percentage * 10) / 10).toFixed(1);
 }
 
 function formatSessionCost(value: number): string | null {
@@ -99,6 +137,7 @@ function getMeterGeometry(showPercentage: boolean, glyphSize?: number) {
 export function ContextWindowMeter({
   maxTokens,
   usedTokens,
+  cachedTokens,
   totalCostUsd,
   showPercentage = false,
   serverId,
@@ -165,6 +204,9 @@ export function ContextWindowMeter({
   const colors = getMeterColors(clampedPercentage, theme);
   const formattedSessionCost =
     typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null;
+  const cacheHitPercentage = getCacheHitPercentage(usedTokens, cachedTokens);
+  const formattedCacheHit =
+    cacheHitPercentage === null ? null : formatCacheHitPercentage(cacheHitPercentage);
 
   return (
     <Tooltip
@@ -228,6 +270,11 @@ export function ContextWindowMeter({
               max: formatTokenCount(maxTokens),
             })}
           </Text>
+          {formattedCacheHit !== null ? (
+            <Text style={styles.tooltipDetail}>
+              {t("contextWindow.cacheHit", { percentage: formattedCacheHit })}
+            </Text>
+          ) : null}
           {formattedSessionCost ? (
             <Text style={styles.tooltipDetail}>
               {t("contextWindow.sessionCost", { cost: formattedSessionCost })}

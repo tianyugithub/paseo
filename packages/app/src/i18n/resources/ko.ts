@@ -1888,6 +1888,8 @@ export const ko: TranslationResources = {
     title: "컨텍스트 윈도우",
     used: "{{percentage}}% 사용됨",
     tokens: "{{used}} / {{max}} 토큰",
+    cacheHit: "캐시 적중 {{percentage}}%",
+    accessibilityWithCache: "컨텍스트 창 {{percentage}}% 사용, 캐시 적중 {{cacheHit}}%",
     sessionCost: "세션 비용 {{cost}}",
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },

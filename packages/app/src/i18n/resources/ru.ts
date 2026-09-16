@@ -1909,6 +1909,9 @@ export const ru: TranslationResources = {
     title: "Контекстное окно",
     used: "Использовано: {{percentage}}%",
     tokens: "Токены: {{used}} / {{max}}",
+    cacheHit: "Попадания в кэш {{percentage}}%",
+    accessibilityWithCache:
+      "Окно контекста использовано на {{percentage}}%, попадания в кэш {{cacheHit}}%",
     sessionCost: "Стоимость сессии: {{cost}}",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },

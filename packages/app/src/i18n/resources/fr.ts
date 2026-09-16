@@ -1929,6 +1929,8 @@ export const fr: TranslationResources = {
     title: "Fenêtre contextuelle",
     used: "{{percentage}}% utilisé",
     tokens: "Jetons{{used}}/{{max}}",
+    cacheHit: "Cache {{percentage}}%",
+    accessibilityWithCache: "Fenêtre de contexte utilisée à {{percentage}} %, cache {{cacheHit}} %",
     sessionCost: "Coût de la séance{{cost}}",
     accessibility: "Fenêtre contextuelle{{percentage}}% utilisé",
   },

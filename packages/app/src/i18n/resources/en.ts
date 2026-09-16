@@ -1888,6 +1888,8 @@ export const en = {
     title: "Context window",
     used: "{{percentage}}% used",
     tokens: "{{used}} / {{max}} tokens",
+    cacheHit: "Cache hit {{percentage}}%",
+    accessibilityWithCache: "Context window {{percentage}}% used, cache hit {{cacheHit}}%",
     sessionCost: "Session cost {{cost}}",
     accessibility: "Context window {{percentage}}% used",
   },

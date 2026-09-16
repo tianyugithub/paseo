@@ -258,11 +258,16 @@ function buildRealtimeVoiceButtonStyle(
 function buildAgentStateSelector(serverId: string, agentId: string) {
   return (state: ReturnType<typeof useSessionStore.getState>) => {
     const agent = state.sessions[serverId]?.agents?.get(agentId) ?? null;
+    // Hoisted so the four usage reads share one optional chain. Spelling out
+    // `agent?.lastUsage?.` per field costs a branch each and pushes this selector past
+    // the configured complexity limit.
+    const usage = agent?.lastUsage;
     return {
       status: agent?.status ?? null,
-      contextWindowMaxTokens: agent?.lastUsage?.contextWindowMaxTokens ?? null,
-      contextWindowUsedTokens: agent?.lastUsage?.contextWindowUsedTokens ?? null,
-      totalCostUsd: agent?.lastUsage?.totalCostUsd ?? null,
+      contextWindowMaxTokens: usage?.contextWindowMaxTokens ?? null,
+      contextWindowUsedTokens: usage?.contextWindowUsedTokens ?? null,
+      contextWindowCachedTokens: usage?.cachedInputTokens ?? null,
+      totalCostUsd: usage?.totalCostUsd ?? null,
       model: agent?.model ?? null,
       provider: agent?.provider ?? null,
     };
@@ -272,6 +277,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
 function renderContextWindowMeter(
   contextWindowMaxTokens: number | null,
   contextWindowUsedTokens: number | null,
+  contextWindowCachedTokens: number | null,
   totalCostUsd: number | null,
   showPercentage: boolean,
   serverId: string,
@@ -287,6 +293,7 @@ function renderContextWindowMeter(
     <ContextWindowMeter
       maxTokens={contextWindowMaxTokens}
       usedTokens={contextWindowUsedTokens}
+      cachedTokens={contextWindowCachedTokens}
       totalCostUsd={totalCostUsd}
       showPercentage={showPercentage}
       serverId={serverId}
@@ -1997,6 +2004,7 @@ function ComposerContentImpl({
       renderContextWindowMeter(
         contextWindowMaxTokens,
         contextWindowUsedTokens,
+        agentState.contextWindowCachedTokens,
         agentState.totalCostUsd,
         false,
         serverId,
@@ -2007,6 +2015,7 @@ function ComposerContentImpl({
     [
       contextWindowMaxTokens,
       contextWindowUsedTokens,
+      agentState.contextWindowCachedTokens,
       agentState.totalCostUsd,
       serverId,
       agentState.provider,

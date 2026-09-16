@@ -1924,6 +1924,9 @@ export const es: TranslationResources = {
     title: "ventana contextual",
     used: "{{percentage}}% utilizado",
     tokens: "Fichas{{used}}/{{max}}",
+    cacheHit: "Aciertos de caché {{percentage}}%",
+    accessibilityWithCache:
+      "Ventana de contexto {{percentage}}% usada, aciertos de caché {{cacheHit}}%",
     sessionCost: "Costo de la sesión{{cost}}",
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },

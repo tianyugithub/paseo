@@ -1896,6 +1896,9 @@ export const ja: TranslationResources = {
     title: "コンテキストウィンドウ",
     used: "{{percentage}}%使用",
     tokens: "{{used}} / {{max}}トークン",
+    cacheHit: "キャッシュヒット {{percentage}}%",
+    accessibilityWithCache:
+      "コンテキストウィンドウ {{percentage}}% 使用、キャッシュヒット {{cacheHit}}%",
     sessionCost: "セッションコスト: {{cost}}",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },

@@ -21,6 +21,7 @@ import {
   type WorkspaceScriptStopRequest,
   type CloseItemsRequest,
   type DirectorySuggestionsRequest,
+  type DirectoryListRequest,
   type ProjectPlacementPayload,
   type WorkspaceSetupSnapshot,
   type WorkspaceDescriptorPayload,
@@ -215,6 +216,7 @@ import {
   searchDirectoryEntries,
   WORKSPACE_SEARCH_HIDDEN_DIRECTORIES,
 } from "../utils/directory-suggestions.js";
+import { listBrowserDirectory } from "./directory-browser/service.js";
 import type { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import type { Resolvable } from "./speech/provider-resolver.js";
 import type { SpeechReadinessSnapshot } from "./speech/speech-runtime.js";
@@ -2641,6 +2643,8 @@ export class Session {
         return this.workspaceFilesSession.handleFileEntryDuplicateRequest(msg);
       case "fs.entry.delete.request":
         return this.workspaceFilesSession.handleFileEntryDeleteRequest(msg);
+      case "fs.directory.list.request":
+        return this.handleDirectoryListRequest(msg);
       case "project_icon_request":
         return this.workspaceFilesSession.handleProjectIconRequest(msg);
       case "project.icon.get.request":
@@ -4486,6 +4490,29 @@ export class Session {
         payload: {
           directories: [],
           entries: [],
+          error: error instanceof Error ? error.message : String(error),
+          requestId,
+        },
+      });
+    }
+  }
+
+  private async handleDirectoryListRequest(msg: DirectoryListRequest): Promise<void> {
+    const { path: directoryPath, includeFiles, requestId } = msg;
+    try {
+      const listing = await listBrowserDirectory({ directoryPath, includeFiles });
+      this.emit({
+        type: "fs.directory.list.response",
+        payload: { ...listing, error: null, requestId },
+      });
+    } catch (error) {
+      this.emit({
+        type: "fs.directory.list.response",
+        payload: {
+          path: directoryPath,
+          parentPath: null,
+          entries: [],
+          truncated: false,
           error: error instanceof Error ? error.message : String(error),
           requestId,
         },

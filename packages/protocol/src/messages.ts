@@ -2743,6 +2743,16 @@ export const FileEntryDeleteRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// Lists a directory by absolute path, with no workspace scope. Every other filesystem RPC is
+// anchored to a workspace `cwd`; Add Project runs before any workspace exists, so it has no cwd
+// to anchor to. Absolute paths are the contract here, not workspace-relative ones.
+export const DirectoryListRequestSchema = z.object({
+  type: z.literal("fs.directory.list.request"),
+  path: z.string(),
+  includeFiles: z.boolean().optional(),
+  requestId: z.string(),
+});
+
 export const ProjectIconRequestSchema = z.object({
   type: z.literal("project_icon_request"),
   cwd: z.string(),
@@ -3218,6 +3228,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   FileEntryRenameRequestSchema,
   FileEntryDuplicateRequestSchema,
   FileEntryDeleteRequestSchema,
+  DirectoryListRequestSchema,
   ProjectIconRequestSchema,
   ProjectIconGetRequestSchema,
   FileDownloadTokenRequestSchema,
@@ -3546,6 +3557,10 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceGithubRepositorySearch: z.boolean().optional(),
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: z.boolean().optional(),
+        // COMPAT(daemonDirectoryBrowser): added in v0.8.1, remove gate after 2027-03-16.
+        // Daemon can list an arbitrary absolute directory, so Add Project can browse the host
+        // filesystem from a phone instead of the desktop-only native dialog.
+        daemonDirectoryBrowser: z.boolean().optional(),
         // COMPAT(projectList): added in v0.2.4, drop the gate when floor >= v0.2.4.
         projectList: z.boolean().optional(),
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
@@ -5805,6 +5820,26 @@ export const FileEntryDeleteResponseSchema = z.object({
   }),
 });
 
+const DirectoryListEntrySchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  kind: z.enum(["file", "directory"]),
+});
+
+export const DirectoryListResponseSchema = z.object({
+  type: z.literal("fs.directory.list.response"),
+  payload: z.object({
+    // The directory actually listed, after `~` expansion and symlink resolution. Clients use it
+    // as the next request's `path` so the browser walks the canonical tree.
+    path: z.string(),
+    parentPath: z.string().nullable(),
+    entries: z.array(DirectoryListEntrySchema),
+    truncated: z.boolean(),
+    error: z.string().nullable(),
+    requestId: z.string(),
+  }),
+});
+
 export const FileUpdateSchema = z.object({
   type: z.literal("fs.file.update"),
   payload: z.object({
@@ -6624,6 +6659,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   FileEntryRenameResponseSchema,
   FileEntryDuplicateResponseSchema,
   FileEntryDeleteResponseSchema,
+  DirectoryListResponseSchema,
   FileUpdateSchema,
   ProjectIconResponseSchema,
   ProjectIconGetResponseSchema,
@@ -7065,6 +7101,9 @@ export type FileEntryDuplicateRequest = z.infer<typeof FileEntryDuplicateRequest
 export type FileEntryDuplicateResponse = z.infer<typeof FileEntryDuplicateResponseSchema>;
 export type FileEntryDeleteRequest = z.infer<typeof FileEntryDeleteRequestSchema>;
 export type FileEntryDeleteResponse = z.infer<typeof FileEntryDeleteResponseSchema>;
+export type DirectoryListRequest = z.infer<typeof DirectoryListRequestSchema>;
+export type DirectoryListResponse = z.infer<typeof DirectoryListResponseSchema>;
+export type DirectoryListEntry = z.infer<typeof DirectoryListEntrySchema>;
 export type FileWriteResult = z.infer<typeof FileWriteResultSchema>;
 export type FileUpdate = z.infer<typeof FileUpdateSchema>;
 export type ProjectIconRequest = z.infer<typeof ProjectIconRequestSchema>;

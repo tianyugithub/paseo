@@ -4611,6 +4611,15 @@ export class DaemonClient {
     });
   }
 
+  async browseDirectory(input: {
+    path: string;
+    includeFiles?: boolean;
+  }): Promise<CorrelatedResponsePayload<"fs.directory.list.response">> {
+    return this.sendNamespacedCorrelatedSessionRequest<"fs.directory.list.response">({
+      message: { type: "fs.directory.list.request", ...input },
+    });
+  }
+
   async checkoutDiscardChanges(
     cwd: string,
     input: { paths: string[] },

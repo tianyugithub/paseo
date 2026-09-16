@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import type { WorkspaceProjectDescriptorPayload } from "@getpaseo/protocol/messages";
 import {
   ArrowLeft,
+  File,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -41,6 +42,7 @@ import {
   currentAddProjectPage,
   moveAddProjectSelection,
   openAddProjectFlow,
+  openDirectoryBrowsePage,
   openDirectorySearchPage,
   openGithubLocationPage,
   openGithubSearchPage,
@@ -164,6 +166,7 @@ function FlowBackButton({ onPress }: { onPress: () => void }) {
 function methodIcon(method: AddProjectMethodId): FlowRowOption["icon"] {
   if (method === "github") return Github;
   if (method === "browse") return FolderOpen;
+  if (method === "browse-folders") return HardDrive;
   if (method === "new-directory") return FolderPlus;
   return Search;
 }
@@ -215,6 +218,8 @@ function pageTitle(page: AddProjectPage): string {
       return "Add project";
     case "directory-search":
       return "Search for directory";
+    case "directory-browse":
+      return shortenPath(page.path);
     case "github-search":
       return "Clone from GitHub";
     case "github-location":
@@ -234,6 +239,8 @@ function pagePlaceholder(page: AddProjectInputPage): string {
       return "Search hosts...";
     case "directory-search":
       return "Search directories or enter a path...";
+    case "directory-browse":
+      return "Filter folders...";
     case "github-search":
       return "Search or enter a GitHub repository...";
     case "github-location":
@@ -328,6 +335,8 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
   const githubSearchByHost = useHostFeatureMap(hostIds, "workspaceGithubRepositorySearch");
   // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
   const createDirectoryByHost = useHostFeatureMap(hostIds, "projectCreateDirectory");
+  // COMPAT(daemonDirectoryBrowser): added in v0.8.1, remove gate after 2027-03-16.
+  const browseHostByHost = useHostFeatureMap(hostIds, "daemonDirectoryBrowser");
   const localServerId = useLocalDaemonServerId();
   const availableHosts = useMemo<AddProjectHost[]>(
     () =>
@@ -342,6 +351,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
             label: host.label,
             canAddProject,
             canBrowse: canAddProject && getIsElectronRuntime() && localServerId === host.serverId,
+            canBrowseHostFilesystem: canAddProject && browseHostByHost.get(host.serverId) === true,
             canCloneGithubRepositories: githubCloneByHost.get(host.serverId) === true,
             canSearchGithubRepositories: githubSearchByHost.get(host.serverId) === true,
             canCreateDirectory: createDirectoryByHost.get(host.serverId) === true,
@@ -349,6 +359,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
         ];
       }),
     [
+      browseHostByHost,
       connectionStatuses,
       createDirectoryByHost,
       githubCloneByHost,
@@ -402,11 +413,14 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // Browsing a directory pushes another page of the same kind, so the input has to key off the
+  // directory too — otherwise walking into a folder keeps the previous folder's filter text.
+  const pageIdentity = page.kind === "directory-browse" ? `${page.kind}:${page.path}` : page.kind;
   useEffect(() => {
     inputRef.current?.replaceText(pageInputValueRef.current);
     const timer = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(timer);
-  }, [page.kind]);
+  }, [pageIdentity]);
 
   const searchesDirectories =
     page.kind === "directory-search" ||
@@ -434,6 +448,25 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     retry: false,
     staleTimeMs: 15_000,
   });
+  const browsePath = page.kind === "directory-browse" ? page.path : null;
+  const browseQuery = useFetchQuery({
+    // Keyed by the requested path, not the resolved one: `~` and symlinks mean the daemon answers
+    // with a different path than we asked for, and the rows must match the page we are on.
+    queryKey: ["add-project-flow-browse", hostId, browsePath],
+    queryFn: async () => {
+      if (!client || browsePath === null) return null;
+      const listing = await client.browseDirectory({ path: browsePath, includeFiles: true });
+      return { requestedPath: browsePath, listing };
+    },
+    enabled: Boolean(client && browsePath !== null),
+    dataShape: "value",
+    retry: false,
+    staleTimeMs: 15_000,
+  });
+  const browseListing =
+    page.kind === "directory-browse" && browseQuery.data?.requestedPath === page.path
+      ? browseQuery.data.listing
+      : null;
   const githubQuery = useFetchQuery({
     queryKey: ["add-project-flow-github", hostId, debouncedQuery],
     queryFn: async () => {
@@ -472,7 +505,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
   );
 
   const openAddedProject = useCallback(
-    async (path: string, sourceKind: "directory-search" | "method") => {
+    async (path: string, sourceKind: "directory-search" | "directory-browse" | "method") => {
       if (!hostId || submissionInFlightRef.current) return;
       submissionInFlightRef.current = true;
       setState((current) =>
@@ -524,6 +557,8 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
       if (!hostId) return;
       if (method === "directory-search") {
         setState((current) => openDirectorySearchPage(current, hostId));
+      } else if (method === "browse-folders") {
+        setState((current) => openDirectoryBrowsePage(current, hostId, "~"));
       } else if (method === "browse") {
         void browse();
       } else if (method === "github") {
@@ -637,6 +672,49 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
         };
       });
     }
+    if (page.kind === "directory-browse") {
+      if (!browseListing) return [];
+      const filter = page.query.trim().toLowerCase();
+      const matching = browseListing.entries.filter(
+        (entry) => filter === "" || entry.name.toLowerCase().includes(filter),
+      );
+      const browseRows: FlowRowOption[] = [
+        {
+          id: "use-current-directory",
+          title: "Use this folder",
+          subtitle: shortenPath(browseListing.path),
+          icon: FolderOpen,
+          testID: "add-project-flow-use-current-directory",
+          select: () => void openAddedProject(browseListing.path, "directory-browse"),
+        },
+      ];
+      // Entering a directory pushes a page rather than rewriting this one, so the flow's back
+      // button walks back up the tree. Files are listed only to show what the folder holds.
+      for (const entry of matching) {
+        if (entry.kind === "file") {
+          browseRows.push({
+            id: entry.path,
+            title: entry.name,
+            subtitle: null,
+            icon: File,
+            disabled: true,
+            testID: pathTestId(entry.path),
+            select: () => undefined,
+          });
+          continue;
+        }
+        browseRows.push({
+          id: entry.path,
+          title: entry.name,
+          subtitle: null,
+          icon: Folder,
+          testID: pathTestId(entry.path),
+          select: () =>
+            setState((current) => openDirectoryBrowsePage(current, page.hostId, entry.path)),
+        });
+      }
+      return browseRows;
+    }
     if (page.kind === "github-search") {
       const search = githubQuery.data?.query === page.query ? githubQuery.data.payload : null;
       const repositories = search?.repositories ?? [];
@@ -701,6 +779,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     }
     return [];
   }, [
+    browseListing,
     cloneRepository,
     directoryPaths,
     githubQuery.data,
@@ -831,16 +910,20 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
       : null;
   const loading =
     (searchesDirectories && (query !== debouncedQuery || directoryQuery.isFetching)) ||
+    (page.kind === "directory-browse" && browseListing === null && !browseQuery.isError) ||
     (page.kind === "github-search" &&
       host?.canSearchGithubRepositories === true &&
       (query !== debouncedQuery || githubQuery.isFetching));
-  const queryError = queryErrorText({
-    searchesDirectories,
-    directoryFailed: directoryQuery.isError,
-    githubFailed: page.kind === "github-search" && githubQuery.isError,
-    githubAvailable: currentGithubSearch?.available ?? null,
-    githubError: currentGithubSearch?.error ?? null,
-  });
+  const queryError =
+    page.kind === "directory-browse"
+      ? (browseListing?.error ?? (browseQuery.isError ? "Unable to read this folder" : null))
+      : queryErrorText({
+          searchesDirectories,
+          directoryFailed: directoryQuery.isError,
+          githubFailed: page.kind === "github-search" && githubQuery.isError,
+          githubAvailable: currentGithubSearch?.available ?? null,
+          githubError: currentGithubSearch?.error ?? null,
+        });
   const preview =
     page.kind === "new-directory-name" && page.name.trim()
       ? joinDirectoryPath(page.parentPath, page.name.trim())

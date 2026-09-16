@@ -27,6 +27,7 @@ const HOST: AddProjectHost = {
   label: "Local",
   canAddProject: true,
   canBrowse: true,
+  canBrowseHostFilesystem: true,
   canCloneGithubRepositories: true,
   canSearchGithubRepositories: true,
   canCreateDirectory: true,
@@ -123,6 +124,7 @@ describe("Add Project options", () => {
       buildAddProjectMethods({
         ...HOST,
         canBrowse: false,
+        canBrowseHostFilesystem: false,
         canCloneGithubRepositories: false,
         canSearchGithubRepositories: false,
         canCreateDirectory: false,
@@ -146,6 +148,21 @@ describe("Add Project options", () => {
         disabled: true,
       },
     ]);
+  });
+
+  it("offers folder browsing only when the host advertises it", () => {
+    expect(buildAddProjectMethods(HOST).map((method) => method.id)).toEqual([
+      "directory-search",
+      "browse-folders",
+      "browse",
+      "github",
+      "new-directory",
+    ]);
+    expect(
+      buildAddProjectMethods({ ...HOST, canBrowseHostFilesystem: false }).map(
+        (method) => method.id,
+      ),
+    ).toEqual(["directory-search", "browse", "github", "new-directory"]);
   });
 
   it("offers manual URL and protocol-specific owner/repo clone choices", () => {
